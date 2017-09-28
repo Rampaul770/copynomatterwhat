@@ -18,22 +18,37 @@ namespace CopyNoMatterWhat
         {
             // Get the subdirectories for the specified directory.
             DirectoryInfo dir = new DirectoryInfo(sourceDirName);
+            DirectoryInfo[] dirs;
 
             TryAgainDriveIsNotReady:
             try {
-                DirectoryInfo[] dirs = dir.GetDirectories();
+                 dirs = dir.GetDirectories();
                 // If the destination directory doesn't exist, create it.
                 if (!Directory.Exists(destDirName)) {
                     Directory.CreateDirectory(destDirName);
                 }
+            } catch (Exception ex) {
+                Thread.Sleep(DELAY);
+                Debug.WriteLine("Get Directories Fail");
+                goto TryAgainDriveIsNotReady;
+            }
 
+            TryAgainDriveIsNotReady2:
+            try {
                 // Get the files in the directory and copy them to the new location.
                 FileInfo[] files = dir.GetFiles();
                 foreach (FileInfo file in files) {
                     string temppath = Path.Combine(destDirName, file.Name);
                     if (!(new FileInfo(temppath).Exists)) copy(file.FullName, temppath, file.Length);
                 }
+            } catch (Exception ex) {
+                Thread.Sleep(DELAY);
+                Debug.WriteLine("Get Directories Fail");
+                goto TryAgainDriveIsNotReady2;
+            }
 
+            TryAgainDriveIsNotReady3:
+            try {
                 // If copying subdirectories, copy them and their contents to new location.
                 if (copySubDirs) {
                     foreach (DirectoryInfo subdir in dirs) {
@@ -41,12 +56,13 @@ namespace CopyNoMatterWhat
                         DirectoryCopy(subdir.FullName, temppath, copySubDirs);
                     }
                 }
-                Debug.WriteLine("Done");
             } catch (Exception ex) {
                 Thread.Sleep(DELAY);
                 Debug.WriteLine("Get Directories Fail");
-                goto TryAgainDriveIsNotReady;
+                goto TryAgainDriveIsNotReady3;
             }
+            Debug.WriteLine("Done");
+
         }
 
 
