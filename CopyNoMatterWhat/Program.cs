@@ -6,13 +6,57 @@ using System.Threading.Tasks;
 using System.IO;
 using System.Threading;
 using System.Diagnostics;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
 
 namespace CopyNoMatterWhat
 {
     public class Program
     {
+        [DllImport("User32.dll")]
+        public static extern Int32 FindWindow(String lpClassName, String lpWindowName);
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        public static extern int SendMessage(int hWnd, int msg, int wParam, IntPtr lParam);
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern IntPtr FindWindowEx(IntPtr parentHandle, IntPtr childAfter, string className, string windowTitle);
+
+        private const int WM_CLOSE = 16;
+        private const int BN_CLICKED = 245;
+        static int hwnd = 0;
+        static IntPtr hwndChild = IntPtr.Zero;
+
         private static DriveInfo di;
-        private static int DELAY = 250;
+        private static int DELAY = 350;
+        private static int bufferSize = 4096;
+        private static BackgroundWorker worker = new BackgroundWorker();
+        private event EventHandler BackgroundWorkFinished;
+
+        static void worker_ProgressChanged(object sender, ProgressChangedEventArgs e)
+        {
+            Console.WriteLine(e.ProgressPercentage.ToString());
+        }
+        static private void Intercept()
+        {
+            //Get a handle for the "1" button
+            hwndChild = FindWindowEx((IntPtr)hwnd, IntPtr.Zero, "Button", "&Try Again");
+
+            //send BN_CLICKED message
+            SendMessage((int)hwndChild, BN_CLICKED, 0, IntPtr.Zero);
+        }
+        static void worker_DoWork(object sender, DoWorkEventArgs e)
+        {
+            while (1 == 1) {
+                //Get a handle for the Calculator Application main window
+                hwnd = FindWindow(null, "CopyNoMatterWhat.exe - Неверный том");
+                if (hwnd != 0) Intercept();
+                Thread.Sleep(1000);
+            }
+        }
+
+        static void worker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        {
+            Console.WriteLine("Done now...");
+        }
 
         private static void DirectoryCopy(string sourceDirName, string destDirName, bool copySubDirs)
         {
@@ -27,14 +71,14 @@ namespace CopyNoMatterWhat
                 if (!Directory.Exists(destDirName)) {
                     Directory.CreateDirectory(destDirName);
                 }
-  
+
                 // Get the files in the directory and copy them to the new location.
                 FileInfo[] files = dir.GetFiles();
                 foreach (FileInfo file in files) {
                     string temppath = Path.Combine(destDirName, file.Name);
                     if (!(new FileInfo(temppath).Exists)) copy(file.FullName, temppath, file.Length);
                 }
-          
+
                 // If copying subdirectories, copy them and their contents to new location.
                 if (copySubDirs) {
                     foreach (DirectoryInfo subdir in dirs) {
@@ -51,10 +95,19 @@ namespace CopyNoMatterWhat
             Debug.WriteLine("Done");
         }
 
-
+        static BackgroundWorker backgroundWorker;
         static void Main(string[] args)
         {
-            di = new DriveInfo("f:");
+            worker.DoWork += worker_DoWork;
+            worker.RunWorkerCompleted += worker_RunWorkerCompleted;
+            worker.ProgressChanged += worker_ProgressChanged;
+            worker.WorkerReportsProgress = true;
+            worker.WorkerSupportsCancellation = true;
+
+            Console.WriteLine("Starting Application...");
+
+            worker.RunWorkerAsync();
+
             DirectoryCopy(@"F:\", "out", true);
         }
 
@@ -62,7 +115,7 @@ namespace CopyNoMatterWhat
         {
             byte[] data = null;
             byte[] chunk = null;
-            int bufferSize = 1024;
+
 
 
             Console.WriteLine("Copying " + path);
